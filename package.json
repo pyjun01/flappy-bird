@@ -1,0 +1,25 @@
+{
+  "name": "flappy-bird",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "author": "pyjun01 <pyjun02@gmail.com>",
+  "license": "MIT",
+  "scripts": {
+    "start": "parcel public/index.html --open",
+    "build": "parcel build src/index.html --no-source-maps"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pyjun01/flappy-bird.git"
+  },
+  "keywords": [],
+  "bugs": {
+    "url": "https://github.com/pyjun01/flappy-bird/issues"
+  },
+  "homepage": "https://github.com/pyjun01/flappy-bird#readme",
+  "devDependencies": {
+    "parcel": "^2.2.0",
+    "prettier": "^2.5.1"
+  }
+}
