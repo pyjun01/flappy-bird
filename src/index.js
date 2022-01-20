@@ -18,10 +18,17 @@ const velocity = 0.5;
 
 const pipes = [];
 
+let score = 0;
+
 let reqId = null;
+let intervalId = null;
 const stop = () => {
   cancelAnimationFrame(reqId);
+  clearInterval(intervalId);
 };
+
+ctx.textAlign = 'center';
+ctx.font = '48px sans-serif';
 
 const render = () => {
   ctx.fillStyle = '#0af';
@@ -32,9 +39,15 @@ const render = () => {
 
   ctx.fillStyle = '#af0';
   pipes.forEach(({ x, y, w, h }) => {
-    ctx.fillRect(x - w / 2, 0, w, y - h / 2);
-    ctx.fillRect(x - w / 2, y + h / 2, w, height - (y + h / 2));
+    ctx.fillRect(x, 0, w, y);
+    ctx.fillRect(x, y + h, w, height - (y + h));
   });
+
+  ctx.fillStyle = '#fa0';
+  ctx.fillRect(0, height - 80, width, 80);
+
+  ctx.fillStyle = '#fff';
+  ctx.fillText(score, width / 2, height / 4);
 };
 
 const FPS = 1000 / 60;
@@ -45,7 +58,7 @@ const animate = (t) => {
 
     render();
 
-    if (v.y + v.h >= height - 80) {
+    if (checkCollision()) {
       return;
     }
   }
@@ -55,18 +68,30 @@ const animate = (t) => {
 
 render();
 
+const checkCollision = () => {
+  if (v.y + v.h >= height - 80) {
+    return true;
+  }
+
+  return pipes.some(
+    ({ x, y, w, h }) =>
+      ((x < v.x + v.w && v.x + v.w <= x + w) || (x < v.x && v.x <= x + w)) &&
+      (v.y <= y || y + h <= v.y + v.h)
+  );
+};
+
 canvas.onclick = () => {
   if (reqId === null) {
-    reqId = requestAnimationFrame(animate);
-
     pipes.push({
-      x: width,
-      y: height / 2,
+      x: width + 26 * 4,
+      y: height / 2 - 65 * 2,
       w: 26 * 4,
       h: 65 * 4,
     });
 
-    setInterval(() => {
+    reqId = requestAnimationFrame(animate);
+
+    intervalId = setInterval(() => {
       v.y += gravity;
 
       if (gravity <= 6) {
@@ -75,16 +100,21 @@ canvas.onclick = () => {
 
       pipes.forEach((d) => {
         d.x = d.x - 1.2;
+
+        if (!d.pass && d.x < v.x) {
+          d.pass = true;
+          score++;
+        }
       });
 
       if (pipes[0].x - pipes[0].w / 2 <= v.x && pipes.length === 1) {
         pipes.push({
           x: width,
-          y: height / 10 + 130 + Math.floor(Math.random() * 6) * (height / 10),
+          y: 130 + (Math.floor(Math.random() * 4) + 1) * (height / 10),
           w: 26 * 4,
           h: 65 * 4,
         });
-      } else if (pipes[0].x + pipes[0].w / 2 <= 0) {
+      } else if (pipes[0].x + pipes[0].w <= 0) {
         pipes.shift();
       }
     }, 1000 / 100);
