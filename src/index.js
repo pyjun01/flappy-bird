@@ -42,7 +42,7 @@ const loadImage = (src) =>
     h: 13 * 4,
   };
   let gravity = -6;
-  const velocity = 0.5;
+  const velocity = 0.6;
 
   const pipes = [];
 
@@ -58,37 +58,50 @@ const loadImage = (src) =>
 
   let frameCount = 0;
 
+  const maxGravity = 10;
+  const curvePoint = 6;
+
+  let curveCount = 0;
+
+  const getDirection = () => {
+    if (gravity >= curvePoint) {
+      if (curveCount < 90) {
+        curveCount += 6;
+      }
+
+      return curveCount;
+    }
+
+    return -20;
+  };
+
   const render = () => {
-    // ctx.fillStyle = '#0af';
-    // ctx.fillRect(0, 0, width, height);
     ctx.drawImage(images.background, 0, 0, width, height);
 
-    // ctx.fillStyle = '#000';
-    // ctx.fillRect(v.x, v.y, v.w, v.h);
+    const direction = getDirection();
+    ctx.translate(v.x + v.w / 2, v.y + v.h / 2);
+    ctx.rotate((direction * Math.PI) / 180);
     ctx.drawImage(
       images.bird,
       ((Math.floor(frameCount / 8) % 3) * images.bird.naturalWidth) / 3,
       0,
       images.bird.naturalWidth / 3,
       images.bird.naturalHeight,
-      v.x,
-      v.y,
+      -v.w / 2,
+      -v.h / 2,
       v.w,
       v.h
     );
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
 
     ctx.fillStyle = '#af0';
     pipes.forEach(({ x, y, w, h }) => {
-      // ctx.fillRect(x, 0, w, y);
-      // ctx.fillRect(x, y + h, w, height - (y + h));
       ctx.rotate((180 * Math.PI) / 180);
       ctx.drawImage(images.pipe, -x - w, -y, w, 597.6231884058);
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.drawImage(images.pipe, x, y + h, w, 597.6231884058);
     });
 
-    // ctx.fillStyle = '#fa0';
-    // ctx.fillRect(0, height - 80, width, 80);
     const w = width / 30;
     for (let i = 0; i < 31; i++) {
       ctx.drawImage(images.ground, w * i - frameCount, height - 80, w, 80);
@@ -103,12 +116,10 @@ const loadImage = (src) =>
   const update = () => {
     v.y += gravity;
 
-    if (gravity <= 6) {
-      gravity += velocity;
-    }
+    gravity < maxGravity ? (gravity += velocity) : (gravity = maxGravity);
 
     pipes.forEach((d) => {
-      d.x = d.x - 1.2;
+      d.x = d.x - width / 150;
 
       if (!d.pass && d.x < v.x) {
         d.pass = true;
@@ -135,9 +146,7 @@ const loadImage = (src) =>
   const animate = (t) => {
     reqId = window.requestAnimationFrame(animate);
 
-    console.log('animate');
     if (t > p + FPS) {
-      console.log('real');
       p = t;
 
       frameCount++;
@@ -184,7 +193,8 @@ const loadImage = (src) =>
       start = true;
     }
 
-    gravity = Math.min(gravity, -9) - 3;
+    gravity = Math.min(gravity, -maxGravity + 2) - 3;
+    curveCount = 0;
   };
 
   reqId = window.requestAnimationFrame(animate);
