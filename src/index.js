@@ -16,6 +16,7 @@ const loadImage = (src) =>
     img.onload = () => res(img);
     img.src = src;
   });
+
 (async () => {
   let images = {};
 
@@ -24,16 +25,30 @@ const loadImage = (src) =>
   images.ground = await loadImage(imageSrcs.ground);
   images.pipe = await loadImage(imageSrcs.pipe);
 
-  console.log(imageSrcs, images);
-
-  const width = 768;
-  const height = 1024;
-
   const canvas = document.querySelector('canvas');
   const ctx = canvas.getContext('2d');
 
-  canvas.width = width;
-  canvas.height = height;
+  const width = (canvas.width = 768);
+  const height = (canvas.height = 1024);
+
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = '48px sans-serif';
+
+  const FPS = 1000 / 144;
+  let p = 0;
+
+  let start = false;
+  let dead = false;
+  let reqId = null;
+  let score = 0;
+
+  let gravity = -6;
+  const velocity = 0.6;
+  const maxGravity = 10;
+
+  const curvePoint = 7;
+  let curveCount = 0;
 
   const v = {
     x: width / 2 - 68,
@@ -41,27 +56,12 @@ const loadImage = (src) =>
     w: 17 * 4,
     h: 13 * 4,
   };
-  let gravity = -6;
-  const velocity = 0.6;
 
   const pipes = [];
 
-  let score = 0;
-
-  let reqId = null;
   const stop = () => {
     cancelAnimationFrame(reqId);
   };
-
-  ctx.textAlign = 'center';
-  ctx.font = '48px sans-serif';
-
-  let frameCount = 0;
-
-  const maxGravity = 10;
-  const curvePoint = 6;
-
-  let curveCount = 0;
 
   const getDirection = () => {
     if (gravity >= curvePoint) {
@@ -75,24 +75,22 @@ const loadImage = (src) =>
     return -20;
   };
 
+  const checkCollision = () => {
+    if (v.y + v.h >= height - 80) {
+      return true;
+    }
+
+    return pipes.some(
+      ({ x, y, w, h }) =>
+        ((x < v.x + v.w && v.x + v.w <= x + w) || (x < v.x && v.x <= x + w)) &&
+        (v.y <= y || y + h <= v.y + v.h)
+    );
+  };
+
+  let renderCount = 0;
+
   const render = () => {
     ctx.drawImage(images.background, 0, 0, width, height);
-
-    const direction = getDirection();
-    ctx.translate(v.x + v.w / 2, v.y + v.h / 2);
-    ctx.rotate((direction * Math.PI) / 180);
-    ctx.drawImage(
-      images.bird,
-      ((Math.floor(frameCount / 8) % 3) * images.bird.naturalWidth) / 3,
-      0,
-      images.bird.naturalWidth / 3,
-      images.bird.naturalHeight,
-      -v.w / 2,
-      -v.h / 2,
-      v.w,
-      v.h
-    );
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
 
     ctx.fillStyle = '#af0';
     pipes.forEach(({ x, y, w, h }) => {
@@ -103,23 +101,141 @@ const loadImage = (src) =>
     });
 
     const w = width / 30;
+    ctx.translate(-(renderCount % 6) * 6, 0);
     for (let i = 0; i < 31; i++) {
-      ctx.drawImage(images.ground, w * i - frameCount, height - 80, w, 80);
+      ctx.drawImage(images.ground, w * i, height - 80, w, 80);
     }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+    // bird
+    const direction = getDirection();
+    ctx.translate(v.x + v.w / 2, v.y + v.h / 2);
+
+    if (start) {
+      ctx.rotate((direction * Math.PI) / 180);
+    }
+
+    let curr = dead
+      ? 0
+      : Math.floor((Math.floor(window.performance.now() / 10) % 100) / 25);
+
+    ctx.drawImage(
+      images.bird,
+      ((curr + (curr === 3 ? -2 : 0)) * images.bird.naturalWidth) / 3,
+      0,
+      images.bird.naturalWidth / 3,
+      images.bird.naturalHeight,
+      -v.w / 2,
+      -v.h / 2,
+      v.w,
+      v.h
+    );
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
 
     ctx.fillStyle = '#fff';
     ctx.fillText(score, width / 2, height / 4);
+
+    !dead && renderCount++;
   };
 
-  const renderGameResult = () => {};
+  const blink = () => {
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, width, height);
+  };
+
+  const renderGameResult = () => {
+    ctx.fillStyle = '#e86102';
+
+    const w = 150;
+    const h = 60;
+
+    const startPoint = [width / 2 - w / 2, height / 2 - h / 2 - 3];
+
+    ctx.fillRect(startPoint[0], startPoint[1], w, h);
+
+    ctx.fillStyle = '#fff';
+    ctx.font = '32px sans-serif';
+    ctx.fillText('RESTART', width / 2, height / 2);
+
+    const onMousemove = (e) => {
+      const bound = ctx.canvas.getBoundingClientRect();
+      const x =
+        ((e.pageX - bound.left) * ctx.canvas.width) / ctx.canvas.clientWidth;
+      const y =
+        ((e.pageY - bound.top) * ctx.canvas.height) / ctx.canvas.clientHeight;
+
+      if (
+        startPoint[0] < x &&
+        x < startPoint[0] + w &&
+        startPoint[1] < y &&
+        y < startPoint[1] + h
+      ) {
+        ctx.canvas.style.cursor = 'pointer';
+      } else {
+        ctx.canvas.style.cursor = 'auto';
+      }
+    };
+
+    const onClick = (e) => {
+      const bound = ctx.canvas.getBoundingClientRect();
+      const x =
+        ((e.pageX - bound.left) * ctx.canvas.width) / ctx.canvas.clientWidth;
+      const y =
+        ((e.pageY - bound.top) * ctx.canvas.height) / ctx.canvas.clientHeight;
+
+      if (
+        startPoint[0] < x &&
+        x < startPoint[0] + w &&
+        startPoint[1] < y &&
+        y < startPoint[1] + h
+      ) {
+        ctx.canvas.style.cursor = 'auto';
+
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = '48px sans-serif';
+
+        start = false;
+        dead = false;
+        score = 0;
+        gravity = -6;
+        curveCount = 0;
+
+        v.x = width / 2 - 68;
+        v.y = height / 2;
+        v.w = 17 * 4;
+        v.h = 13 * 4;
+
+        pipes.length = 0;
+
+        reqId = window.requestAnimationFrame(animate);
+
+        ctx.canvas.removeEventListener('mousemove', onMousemove);
+        ctx.canvas.removeEventListener('click', onClick);
+        ctx.canvas.addEventListener('click', onCanvasClick);
+      }
+    };
+
+    ctx.canvas.addEventListener('mousemove', onMousemove);
+
+    ctx.canvas.addEventListener('click', onClick);
+  };
 
   const update = () => {
+    if (dead) {
+      gravity = maxGravity + 2;
+
+      v.y += gravity;
+
+      return;
+    }
+
     v.y += gravity;
 
     gravity < maxGravity ? (gravity += velocity) : (gravity = maxGravity);
 
     pipes.forEach((d) => {
-      d.x = d.x - width / 150;
+      d.x = d.x - 6;
 
       if (!d.pass && d.x < v.x) {
         d.pass = true;
@@ -139,49 +255,38 @@ const loadImage = (src) =>
     }
   };
 
-  const FPS = 1000 / 144;
-  let p = 0;
-
-  let start = false;
   const animate = (t) => {
     reqId = window.requestAnimationFrame(animate);
 
     if (t > p + FPS) {
       p = t;
 
-      frameCount++;
-
-      if (frameCount >= width / 30) {
-        frameCount = 0;
-      }
-
       start && update();
       render();
 
-      if (checkCollision()) {
+      if (v.y >= height + v.h) {
         stop();
 
         renderGameResult();
         return;
       }
+
+      if (!dead && checkCollision()) {
+        dead = true;
+
+        canvas.removeEventListener('click', onCanvasClick);
+
+        blink();
+        stop();
+
+        setTimeout(() => {
+          reqId = window.requestAnimationFrame(animate);
+        }, 100);
+      }
     }
   };
 
-  render();
-
-  const checkCollision = () => {
-    if (v.y + v.h >= height - 80) {
-      return true;
-    }
-
-    return pipes.some(
-      ({ x, y, w, h }) =>
-        ((x < v.x + v.w && v.x + v.w <= x + w) || (x < v.x && v.x <= x + w)) &&
-        (v.y <= y || y + h <= v.y + v.h)
-    );
-  };
-
-  canvas.onclick = () => {
+  const onCanvasClick = () => {
     if (pipes.length === 0) {
       pipes.push({
         x: width + 26 * 4,
@@ -193,9 +298,11 @@ const loadImage = (src) =>
       start = true;
     }
 
-    gravity = Math.min(gravity, -maxGravity + 2) - 3;
+    gravity = Math.min(gravity, -maxGravity + 1) - 3;
     curveCount = 0;
   };
+
+  canvas.addEventListener('click', onCanvasClick);
 
   reqId = window.requestAnimationFrame(animate);
 })();
